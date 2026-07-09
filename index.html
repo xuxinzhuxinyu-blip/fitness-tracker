@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>健身容量记录</title>
+<style>
+  :root {
+    --bg: #12121a;
+    --bg-card: #1a1a28;
+    --bg-input: #222236;
+    --accent: #ff6b35;
+    --accent-hover: #ff8c60;
+    --text: #e8e8ec;
+    --text-muted: #7c7c94;
+    --border: #2a2a40;
+    --danger: #e74c3c;
+    --success: #4caf84;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 2px 16px rgba(0,0,0,0.4);
+    --blue: #4a90d9;
+    --green: #4caf84;
+    --yellow: #d4a843;
+    --purple: #9b7ec4;
+    --pink: #d97b93;
+    --orange: #e07b4c;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ==================== Pages ==================== */
+  .page {
+    position: absolute; top:0; left:0; width:100%; min-height:100vh;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    will-change: transform; padding-bottom: 40px;
+  }
+  #page-calendar { transform: translateX(0); z-index:1; }
+  #page-detail  { transform: translateX(100%); z-index:2; }
+  body.on-detail #page-calendar { transform: translateX(-100%); pointer-events:none; }
+  body.on-detail #page-detail  { transform: translateX(0); }
+
+  /* ==================== Calendar Page ==================== */
+  .cal-header { padding:20px 16px 12px; text-align:center; position:sticky; top:0; z-index:10; background:linear-gradient(180deg, var(--bg) 60%, transparent); }
+  .cal-header h1 { font-size:22px; background:linear-gradient(135deg, var(--accent), #ff9a56); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px; }
+  .cal-header .subtitle { font-size:12px; color:var(--text-muted); }
+  .month-nav { display:flex; align-items:center; justify-content:center; gap:16px; margin:16px 0 8px; }
+  .month-nav button { background:var(--bg-input); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:18px; transition:all 0.2s; display:flex; align-items:center; justify-content:center; }
+  .month-nav button:hover { background:var(--accent); border-color:var(--accent); }
+  .month-nav .month-label { font-size:18px; font-weight:700; min-width:140px; text-align:center; }
+  .month-nav .today-btn { font-size:12px; width:auto; height:28px; padding:0 12px; border-radius:14px; }
+  .weekdays { display:grid; grid-template-columns:repeat(7,1fr); max-width:500px; margin:0 auto; padding:8px 8px 4px; text-align:center; font-size:12px; color:var(--text-muted); font-weight:600; }
+  .weekdays .weekend { color:var(--accent); }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); max-width:500px; margin:0 auto; padding:0 8px; gap:4px; }
+  .cal-cell { aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; font-size:15px; font-weight:500; background:transparent; border:1px solid transparent; user-select:none; }
+  .cal-cell:hover { background:var(--bg-card); border-color:var(--border); }
+  .cal-cell:active { transform:scale(0.95); }
+  .cal-cell.other-month { color:#3a3a5c; pointer-events:none; }
+  .cal-cell.today { border-color:var(--accent); background:rgba(255,107,53,0.08); }
+  .cal-cell.today .day-num { color:var(--accent); font-weight:700; }
+  .cal-cell .day-num { position:relative; z-index:1; }
+  .cal-dots { display:flex; gap:3px; margin-top:2px; }
+  .cal-dot { width:5px; height:5px; border-radius:50%; }
+  .cal-dot.training { background:var(--blue); }
+  .cal-dot.body { background:var(--green); }
+  .cal-dot.diary { background:var(--yellow); }
+  .cal-stats { max-width:500px; margin:16px auto 0; padding:0 16px; display:flex; gap:8px; }
+  .stat-card { flex:1; background:var(--bg-card); border-radius:var(--radius); padding:12px; text-align:center; border:1px solid var(--border); }
+  .stat-card .stat-num { font-size:24px; font-weight:700; color:var(--accent); }
+  .stat-card .stat-label { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .cal-legend { max-width:500px; margin:12px auto 0; padding:0 16px; display:flex; gap:16px; justify-content:center; font-size:11px; color:var(--text-muted); }
+  .cal-legend span { display:flex; align-items:center; gap:4px; }
+  .cal-legend .leg-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+  /* ==================== Detail Page Header ==================== */
+  .detail-header {
+    display:flex; align-items:center; gap:12px;
+    padding:14px 16px; position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg, var(--bg) 60%, transparent);
+  }
+  .back-btn {
+    background:var(--bg-input); border:1px solid var(--border);
+    color:var(--text); width:34px; height:34px; border-radius:50%;
+    cursor:pointer; font-size:18px; display:flex; align-items:center;
+    justify-content:center; flex-shrink:0; transition:all 0.2s;
+  }
+  .back-btn:hover { background:var(--accent); border-color:var(--accent); }
+  .detail-date { font-size:18px; font-weight:700; flex:1; }
+
+  /* Tabs */
+  .tabs { display:flex; gap:0; padding:0 16px; max-width:700px; margin:0 auto 8px; }
+  .tab-btn {
+    flex:1; padding:10px 4px; background:transparent; border:none;
+    color:var(--text-muted); font-size:13px; cursor:pointer;
+    border-bottom:2px solid transparent; transition:all 0.3s;
+    white-space:nowrap; font-family:inherit;
+  }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  /* ==================== Training Tab (New Design) ==================== */
+  .train-main { max-width:600px; margin:0 auto; padding:0 16px 100px; }
+
+  /* Muscle summary row */
+  .muscle-summary { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .muscle-tag {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 14px; border-radius:20px;
+    font-size:13px; font-weight:600;
+    background:var(--bg-card); border:1px solid var(--border);
+  }
+  .muscle-tag .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .muscle-tag .count { color:var(--text-muted); font-weight:400; font-size:12px; margin-left:2px; }
+
+  /* Exercise Card */
+  .ex-card {
+    background:var(--bg-card); border-radius:var(--radius);
+    margin-bottom:12px; overflow:hidden;
+    border:1px solid var(--border);
+    border-left:4px solid transparent;
+  }
+  .ex-card .ex-top {
+    display:flex; align-items:center; gap:10px;
+    padding:14px 16px 10px;
+  }
+  .ex-card .ex-icon {
+    width:38px; height:38px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; flex-shrink:0;
+  }
+  .ex-card .ex-info { flex:1; min-width:0; }
+  .ex-card .ex-name { font-size:15px; font-weight:700; }
+  .ex-card .ex-muscle {
+    font-size:11px; color:var(--text-muted);
+    display:flex; align-items:center; gap:4px; margin-top:2px;
+  }
+  .ex-card .ex-muscle-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .ex-card .ex-card-actions { display:flex; gap:4px; }
+  .ex-card .ex-card-actions button {
+    background:transparent; border:none; color:var(--text-muted);
+    font-size:18px; cursor:pointer; padding:4px 6px; border-radius:6px; transition:all 0.2s;
+  }
+  .ex-card .ex-card-actions button:hover { color:var(--text); background:var(--bg-input); }
+  .ex-card .toggle-arrow {
+    background:transparent; border:none; color:var(--text-muted);
+    font-size:14px; cursor:pointer; padding:6px 8px; border-radius:6px;
+    transition:all 0.3s; flex-shrink:0;
+  }
+  .ex-card .toggle-arrow:hover { color:var(--text); background:var(--bg-input); }
+  .ex-card .toggle-arrow.open { transform:rotate(180deg); }
+  .ex-card .sets-wrap {
+    overflow:hidden; transition:max-height 0.3s ease;
+    max-height:2000px;
+  }
+  .ex-card .sets-wrap.collapsed { max-height:0; padding-top:0; padding-bottom:0; margin:0; }
+
+  /* Set rows inside card */
+  .ex-card .sets-wrap { padding:0 16px 14px; }
+  .set-row {
+    display:flex; align-items:center; gap:8px;
+    padding:8px 12px; margin-bottom:6px;
+    background:var(--bg-input); border-radius:8px;
+  }
+  .set-row .set-num { font-size:12px; color:var(--text-muted); font-weight:600; width:32px; flex-shrink:0; }
+  .set-row .set-val {
+    flex:1; display:flex; align-items:center; gap:6px;
+    font-size:15px; font-weight:600;
+  }
+  .set-row .set-val .kg { color:var(--accent); min-width:36px; }
+  .set-row .set-val .times { color:var(--text-muted); font-weight:400; margin:0 2px; }
+  .set-row .set-val .reps-num { color:var(--text); }
+  .set-row .set-del {
+    background:transparent; border:none; color:var(--text-muted);
+    cursor:pointer; font-size:16px; padding:2px 6px; border-radius:4px;
+  }
+  .set-row .set-del:hover { color:var(--danger); }
+
+  /* Set row labels */
+  .set-row .kg { color:var(--accent); min-width:30px; }
+  .set-row .reps-num { color:var(--text); }
+  .kg-label, .reps-label { font-size:11px; color:var(--text-muted); }
+
+  /* Add set row (always visible, for infinite adding) */
+  .add-set-row {
+    display:flex; align-items:center; gap:8px;
+    padding:10px 12px; margin-top:6px;
+    background:rgba(255,107,53,0.04); border:1px dashed var(--accent);
+    border-radius:10px;
+  }
+  .add-set-num { font-size:12px; color:var(--accent); font-weight:600; min-width:44px; flex-shrink:0; }
+  .add-set-input {
+    width:64px; padding:8px 6px;
+    background:var(--bg-input); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:15px; font-weight:600;
+    text-align:center; font-family:inherit;
+    transition:border-color 0.2s;
+  }
+  .add-set-input:focus { outline:none; border-color:var(--accent); }
+  .add-set-label { font-size:12px; color:var(--text-muted); }
+  .add-set-btn {
+    padding:8px 16px; background:var(--accent); color:#fff;
+    border:none; border-radius:8px; font-size:13px; font-weight:600;
+    cursor:pointer; transition:all 0.2s; font-family:inherit; flex-shrink:0;
+  }
+  .add-set-btn:hover { background:var(--accent-hover); }
+  .add-set-btn:active { transform:scale(0.96); }
+
+  /* Add Exercise Button */
+  .add-ex-btn {
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; padding:14px;
+    background:var(--bg-card); border:1px dashed var(--border);
+    border-radius:var(--radius); color:var(--text-muted); font-size:14px;
+    cursor:pointer; transition:all 0.2s; font-family:inherit; margin-top:4px;
+  }
+  .add-ex-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* Save (Done) Button */
+  .done-btn {
+    position:fixed; bottom:20px; left:16px; right:16px; max-width:568px;
+    margin:0 auto; padding:14px;
+    background:var(--accent); color:#fff; border:none;
+    border-radius:var(--radius); font-size:16px; font-weight:700;
+    cursor:pointer; transition:all 0.2s; font-family:inherit;
+    box-shadow:0 4px 20px rgba(255,107,53,0.3); z-index:50;
+  }
+  .done-btn:hover { background:var(--accent-hover); transform:translateY(-2px); }
+  .done-btn:active { transform:scale(0.98); }
+
+  /* Quick-add exercise modal */
+  .quick-add {
+    background:var(--bg-card); border:1px solid var(--border);
+    border-left:4px solid var(--accent); border-radius:var(--radius);
+    padding:16px; margin-bottom:12px; margin-top:8px;
+  }
+  .quick-add .qa-row { display:flex; gap:8px; margin-bottom:8px; }
+  .quick-add .qa-row:last-child { margin-bottom:0; }
+  .quick-add input, .quick-add select {
+    padding:10px 12px; background:var(--bg-input); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:14px; font-family:inherit;
+    -webkit-appearance:none; transition:border-color 0.2s;
+  }
+  .quick-add input:focus, .quick-add select:focus { outline:none; border-color:var(--accent); }
+  .quick-add .qa-name { flex:2; }
+  .quick-add .qa-muscle { flex:1; }
+  .quick-add .qa-actions { display:flex; gap:8px; margin-top:10px; }
+  .qa-actions button {
+    flex:1; padding:10px; border-radius:8px; font-size:14px; font-weight:600;
+    cursor:pointer; transition:all 0.2s; font-family:inherit; border:none;
+  }
+  .qa-actions .qa-save { background:var(--accent); color:#fff; }
+  .qa-actions .qa-cancel { background:var(--bg-input); color:var(--text-muted); border:1px solid var(--border); }
+
+  /* ==================== Body & Diary Tabs (keep mostly same) ==================== */
+  .detail-main { max-width:600px; margin:0 auto; padding:16px 16px 80px; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  .card {
+    background:var(--bg-card); border-radius:var(--radius); padding:16px;
+    margin-bottom:12px; box-shadow:var(--shadow); border:1px solid var(--border);
+  }
+  .card h3 { font-size:15px; margin-bottom:12px; color:var(--accent); display:flex; align-items:center; gap:8px; }
+  label { display:block; font-size:13px; color:var(--text-muted); margin-bottom:4px; margin-top:10px; }
+  label:first-of-type { margin-top:0; }
+  input, textarea, select {
+    width:100%; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:14px; font-family:inherit;
+    transition:border-color 0.2s; -webkit-appearance:none;
+  }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:var(--accent); }
+  textarea { resize:vertical; min-height:60px; }
+  .measure-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; }
+  .measure-grid .field { display:flex; flex-direction:column; }
+  .measure-grid label { margin-bottom:2px; font-size:12px; }
+  .btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:10px 20px; border:none; border-radius:8px; font-size:14px;
+    font-weight:600; cursor:pointer; transition:all 0.2s; font-family:inherit;
+  }
+  .btn-primary { background:var(--accent); color:#fff; width:100%; margin-top:12px; }
+  .btn-primary:hover { background:var(--accent-hover); }
+  .btn-sm { padding:6px 12px; font-size:12px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); }
+  .btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-danger { background:transparent; border:1px solid var(--danger); color:var(--danger); }
+  .btn-danger:hover { background:var(--danger); color:#fff; }
+  .history-item {
+    background:var(--bg-card); border-radius:var(--radius); padding:12px 16px;
+    margin-bottom:8px; border:1px solid var(--border); transition:all 0.2s;
+  }
+  .history-item:hover { border-color:var(--accent); }
+  .history-item .date-label { font-size:13px; color:var(--accent); margin-bottom:4px; font-weight:600; }
+  .history-item .summary { font-size:13px; color:var(--text-muted); display:flex; flex-wrap:wrap; gap:4px 16px; }
+  .history-item .actions { display:flex; gap:8px; margin-top:8px; }
+  .diary-card {
+    background:var(--bg-card); border-radius:var(--radius); padding:16px;
+    margin-bottom:12px; border:1px solid var(--border);
+  }
+  .diary-card .diary-date { font-size:13px; color:var(--accent); font-weight:600; margin-bottom:8px; }
+  .diary-card .diary-meta { display:flex; gap:16px; margin-bottom:8px; font-size:13px; }
+  .diary-card .diary-section { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+  .diary-card .diary-section .label { font-size:11px; color:var(--text-muted); margin-bottom:2px; }
+  .diary-card .diary-section .content { font-size:14px; }
+  .feeling-group { display:flex; gap:8px; margin-top:8px; }
+  .feeling-btn {
+    flex:1; padding:10px 4px; background:var(--bg-input); border:2px solid var(--border);
+    border-radius:8px; cursor:pointer; font-size:24px; text-align:center; transition:all 0.2s;
+  }
+  .feeling-btn.selected { border-color:var(--accent); background:rgba(255,107,53,0.15); transform:scale(1.05); }
+  .feeling-btn:hover { border-color:var(--accent); }
+  .feeling-label { font-size:11px; display:block; margin-top:2px; color:var(--text-muted); }
+  .chart-container { margin-top:16px; background:var(--bg-card); border-radius:var(--radius); padding:16px; border:1px solid var(--border); }
+  .chart-container h3 { font-size:14px; color:var(--accent); margin-bottom:12px; }
+  canvas { width:100%; height:200px; display:block; }
+  .toggle-wrap { display:flex; align-items:center; gap:12px; margin-top:10px; }
+  .toggle { position:relative; width:48px; height:28px; background:var(--bg-input); border-radius:14px; cursor:pointer; border:2px solid var(--border); transition:all 0.3s; }
+  .toggle.on { background:var(--success); border-color:var(--success); }
+  .toggle::after { content:''; position:absolute; width:20px; height:20px; border-radius:50%; background:#fff; top:2px; left:2px; transition:transform 0.3s; }
+  .toggle.on::after { transform:translateX(20px); }
+  .toggle-label { font-size:14px; }
+  .empty-state { text-align:center; padding:40px 16px; color:var(--text-muted); }
+  .empty-state .icon { font-size:48px; margin-bottom:12px; }
+  .empty-state p { font-size:14px; }
+
+  /* Responsive */
+  @media (max-width:480px) {
+    .cal-cell { font-size:13px; }
+    .cal-dots { gap:2px; } .cal-dot { width:4px; height:4px; }
+    .measure-grid { grid-template-columns:1fr 1fr; }
+    .cal-stats { flex-wrap:wrap; }
+    .quick-add .qa-row { flex-direction:column; }
+    .set-row { gap:4px; padding:8px 10px; }
+    .set-row .set-val { font-size:14px; gap:4px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== PAGE 1: CALENDAR ==================== -->
+<div class="page" id="page-calendar">
+  <div class="cal-header">
+    <h1>💪 健身容量记录</h1>
+    <p class="subtitle">点击日期查看/添加记录</p>
+    <div class="month-nav">
+      <button onclick="prevMonth()">◀</button>
+      <span class="month-label" id="monthLabel"></span>
+      <button onclick="nextMonth()">▶</button>
+      <button class="today-btn" onclick="goCalendarToday()">今天</button>
+    </div>
+  </div>
+  <div class="weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span class="weekend">六</span><span class="weekend">日</span></div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-legend">
+    <span><i class="leg-dot" style="background:var(--blue)"></i>有训练</span>
+    <span><i class="leg-dot" style="background:var(--green)"></i>身体数据</span>
+    <span><i class="leg-dot" style="background:var(--yellow)"></i>有日记</span>
+  </div>
+  <div class="cal-stats">
+    <div class="stat-card"><div class="stat-num" id="statTrainDays">0</div><div class="stat-label">本月训练天数</div></div>
+    <div class="stat-card"><div class="stat-num" id="statSets">0</div><div class="stat-label">本月总组数</div></div>
+    <div class="stat-card"><div class="stat-num" id="statDiaries">0</div><div class="stat-label">本月日记数</div></div>
+  </div>
+  <div style="max-width:500px;margin:16px auto;padding:0 16px">
+    <div class="card" style="text-align:center;" id="todayPreview">
+      <div style="font-size:14px;color:var(--text-muted)">点击日历中的日期开始记录</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE 2: DETAIL ==================== -->
+<div class="page" id="page-detail">
+  <div class="detail-header">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <span class="detail-date" id="detailDateLabel"></span>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtn-training" onclick="switchDetailTab('training')">🏋️ 训练记录</button>
+    <button class="tab-btn" id="tabBtn-body" onclick="switchDetailTab('body')">📊 身体数据</button>
+    <button class="tab-btn" id="tabBtn-diary" onclick="switchDetailTab('diary')">📝 成长日记</button>
+  </div>
+
+  <!-- ===== TAB: TRAINING (New Design) ===== -->
+  <div class="tab-content active" id="tab-training">
+    <div class="train-main">
+      <!-- Muscle group summary -->
+      <div class="muscle-summary" id="muscleSummary"></div>
+
+      <!-- Exercise cards -->
+      <div id="exerciseCards"></div>
+
+      <!-- Quick-add form (hidden by default) -->
+      <div class="quick-add" id="quickAdd" style="display:none;">
+        <div class="qa-row">
+          <input type="text" class="qa-name" id="qaName" placeholder="动作名称，如：卧推">
+          <select class="qa-muscle" id="qaMuscle">
+            <option value="">选部位</option>
+            <optgroup label="胸">
+              <option value="上胸">上胸</option><option value="中胸">中胸</option><option value="下胸">下胸</option><option value="胸">胸(综合)</option>
+            </optgroup>
+            <optgroup label="背">
+              <option value="背阔肌">背阔肌</option><option value="上背">上背</option><option value="下背">下背</option><option value="背">背(综合)</option>
+            </optgroup>
+            <optgroup label="腿">
+              <option value="股四头肌">股四头肌</option><option value="腘绳肌">腘绳肌</option><option value="臀腿">臀腿</option><option value="小腿">小腿</option><option value="腿">腿(综合)</option>
+            </optgroup>
+            <optgroup label="肩">
+              <option value="前束">前束</option><option value="中束">中束</option><option value="后束">后束</option><option value="肩">肩(综合)</option>
+            </optgroup>
+            <optgroup label="手臂">
+              <option value="二头">二头</option><option value="三头">三头</option><option value="小臂">小臂</option><option value="手臂">手臂(综合)</option>
+            </optgroup>
+            <optgroup label="腹">
+              <option value="上腹">上腹</option><option value="下腹">下腹</option><option value="侧腹">侧腹</option><option value="腹">腹(综合)</option>
+            </optgroup>
+            <optgroup label="其他">
+              <option value="核心">核心</option><option value="有氧">有氧</option><option value="全身">全身</option><option value="其他">其他</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="qa-actions">
+          <button class="qa-save" onclick="confirmAddExercise()">✓ 添加动作</button>
+          <button class="qa-cancel" onclick="cancelQuickAdd()">取消</button>
+        </div>
+      </div>
+
+      <!-- Add exercise button -->
+      <button class="add-ex-btn" id="addExBtn" onclick="showQuickAdd()">+ 添加训练动作</button>
+    </div>
+
+    <!-- Done button -->
+    <button class="done-btn" onclick="saveWorkout()" id="doneBtn" style="display:none;">✅ 保存训练记录</button>
+  </div>
+
+  <!-- ===== TAB: BODY ===== -->
+  <div class="tab-content" id="tab-body">
+    <div class="detail-main">
+      <div class="card">
+        <h3>📏 <span id="bodyFormTitle">记录身体数据</span></h3>
+        <input type="hidden" id="bodyEditId">
+        <div class="measure-grid"><div class="field"><label>⚖️ 体重 (kg)</label><input type="number" id="bodyWeight" placeholder="75.5" step="0.1" min="0"></div></div>
+        <div class="measure-grid" style="margin-top:8px;">
+          <div class="field"><label>胸围 (cm)</label><input type="number" id="bodyChest" placeholder="98" step="0.1" min="0"></div>
+          <div class="field"><label>腰围 (cm)</label><input type="number" id="bodyWaist" placeholder="82" step="0.1" min="0"></div>
+          <div class="field"><label>臀围 (cm)</label><input type="number" id="bodyHip" placeholder="95" step="0.1" min="0"></div>
+          <div class="field"><label>左臂围 (cm)</label><input type="number" id="bodyLeftArm" placeholder="35" step="0.1" min="0"></div>
+          <div class="field"><label>右臂围 (cm)</label><input type="number" id="bodyRightArm" placeholder="36" step="0.1" min="0"></div>
+          <div class="field"><label>左腿围 (cm)</label><input type="number" id="bodyLeftThigh" placeholder="55" step="0.1" min="0"></div>
+          <div class="field"><label>右腿围 (cm)</label><input type="number" id="bodyRightThigh" placeholder="56" step="0.1" min="0"></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="saveBody()" style="flex:1;">💾 保存数据</button>
+          <button class="btn btn-sm" id="cancelBodyEdit" style="display:none;margin-top:12px;" onclick="cancelBodyEdit()">取消编辑</button>
+        </div>
+      </div>
+      <div class="chart-container" id="weightChartContainer" style="display:none;"><h3>📈 体重变化趋势</h3><canvas id="weightChart"></canvas></div>
+      <div id="bodyHistory"></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: DIARY ===== -->
+  <div class="tab-content" id="tab-diary">
+    <div class="detail-main">
+      <div class="card">
+        <h3>✍️ <span id="diaryFormTitle">写日记</span></h3>
+        <input type="hidden" id="diaryEditId">
+        <label>今日完成</label>
+        <div class="toggle-wrap"><div class="toggle on" id="diaryCompleted" onclick="toggleCompleted()"></div><span class="toggle-label" id="diaryCompletedLabel">已完成训练 ✓</span></div>
+        <label style="margin-top:12px;">今日感觉</label>
+        <div class="feeling-group" id="feelingGroup">
+          <div class="feeling-btn" data-feeling="优秀" onclick="selectFeeling(this)">😄<span class="feeling-label">优秀</span></div>
+          <div class="feeling-btn" data-feeling="良好" onclick="selectFeeling(this)">😊<span class="feeling-label">良好</span></div>
+          <div class="feeling-btn" data-feeling="一般" onclick="selectFeeling(this)">😐<span class="feeling-label">一般</span></div>
+          <div class="feeling-btn" data-feeling="疲惫" onclick="selectFeeling(this)">😫<span class="feeling-label">疲惫</span></div>
+        </div>
+        <label style="margin-top:12px;">今日进步</label>
+        <input type="text" id="diaryProgress" placeholder="比如：卧推比上周多了5kg...">
+        <label>今日感想</label>
+        <textarea id="diaryThoughts" placeholder="今天训练的感受、想法..."></textarea>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="saveDiary()" style="flex:1;">💾 保存日记</button>
+          <button class="btn btn-sm" id="cancelDiaryEdit" style="display:none;margin-top:12px;" onclick="cancelDiaryEdit()">取消编辑</button>
+        </div>
+      </div>
+      <div id="diaryHistory"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== DATA LAYER ====================
+var STORAGE_KEYS = { training:'ft_training', body:'ft_body', diary:'ft_diary' };
+function loadData(key) { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS[key])) || []; } catch(e) { return []; } }
+function saveData(key, data) { localStorage.setItem(STORAGE_KEYS[key], JSON.stringify(data)); }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+// ==================== MUSCLE CONFIG ====================
+var MUSCLE_INFO = {
+  '上胸':   { icon:'🏋️', color:'#4a90d9', bg:'rgba(74,144,217,0.15)' },
+  '中胸':   { icon:'🏋️', color:'#3d7ec5', bg:'rgba(61,126,197,0.15)' },
+  '下胸':   { icon:'🏋️', color:'#5ba3e6', bg:'rgba(91,163,230,0.15)' },
+  '胸':     { icon:'🏋️', color:'#4a90d9', bg:'rgba(74,144,217,0.15)' },
+  '背阔肌': { icon:'🔙', color:'#e07b4c', bg:'rgba(224,123,76,0.15)' },
+  '上背':   { icon:'🔙', color:'#d9703a', bg:'rgba(217,112,58,0.15)' },
+  '下背':   { icon:'🔙', color:'#e88a5e', bg:'rgba(232,138,94,0.15)' },
+  '背':     { icon:'🔙', color:'#e07b4c', bg:'rgba(224,123,76,0.15)' },
+  '股四头肌':{ icon:'🦵', color:'#4caf84', bg:'rgba(76,175,132,0.15)' },
+  '腘绳肌': { icon:'🦵', color:'#3d9e6e', bg:'rgba(61,158,110,0.15)' },
+  '臀腿':   { icon:'🍑', color:'#5cbf94', bg:'rgba(92,191,148,0.15)' },
+  '小腿':   { icon:'🦶', color:'#6ccfa4', bg:'rgba(108,207,164,0.15)' },
+  '腿':     { icon:'🦵', color:'#4caf84', bg:'rgba(76,175,132,0.15)' },
+  '前束':   { icon:'💪', color:'#d4a843', bg:'rgba(212,168,67,0.15)' },
+  '中束':   { icon:'💪', color:'#c49a38', bg:'rgba(196,154,56,0.15)' },
+  '后束':   { icon:'💪', color:'#e0b854', bg:'rgba(224,184,84,0.15)' },
+  '肩':     { icon:'💪', color:'#d4a843', bg:'rgba(212,168,67,0.15)' },
+  '二头':   { icon:'🦾', color:'#9b7ec4', bg:'rgba(155,126,196,0.15)' },
+  '三头':   { icon:'🦾', color:'#8e6eb8', bg:'rgba(142,110,184,0.15)' },
+  '小臂':   { icon:'💪', color:'#ae8fd4', bg:'rgba(174,143,212,0.15)' },
+  '手臂':   { icon:'🦾', color:'#9b7ec4', bg:'rgba(155,126,196,0.15)' },
+  '上腹':   { icon:'🫃', color:'#d97b93', bg:'rgba(217,123,147,0.15)' },
+  '下腹':   { icon:'🫃', color:'#c96a82', bg:'rgba(201,106,130,0.15)' },
+  '侧腹':   { icon:'🫃', color:'#e88ca4', bg:'rgba(232,140,164,0.15)' },
+  '腹':     { icon:'🫃', color:'#d97b93', bg:'rgba(217,123,147,0.15)' },
+  '核心':   { icon:'🎯', color:'#f0a060', bg:'rgba(240,160,96,0.15)' },
+  '有氧':   { icon:'🏃', color:'#60c0d0', bg:'rgba(96,192,208,0.15)' },
+  '全身':   { icon:'🧍', color:'#8899aa', bg:'rgba(136,153,170,0.15)' },
+  '其他':   { icon:'🏃', color:'#7c7c94', bg:'rgba(124,124,148,0.15)' }
+};
+
+// ==================== PAGE NAVIGATION ====================
+var selectedDate = new Date().toISOString().slice(0,10);
+var currentMonth = new Date().getMonth();
+var currentYear = new Date().getFullYear();
+var workoutExercises = []; // In-memory workout being edited: [{id,name,muscle,sets:[{weight,reps}]}]
+
+function openDetail(dateStr) {
+  selectedDate = dateStr;
+  document.getElementById('detailDateLabel').textContent = formatDateLong(dateStr);
+  document.body.classList.add('on-detail');
+  switchDetailTab('training');
+  loadWorkoutForDate();
+  refreshDetailAll();
+  setTimeout(function(){ drawWeightChart(); }, 200);
+}
+function goBack() {
+  document.body.classList.remove('on-detail');
+  renderCalendar();
+}
+
+// ==================== DATE FORMAT ====================
+function formatDateLong(dateStr) {
+  var d = new Date(dateStr+'T00:00:00');
+  var today = new Date(); today.setHours(0,0,0,0);
+  var target = new Date(d); target.setHours(0,0,0,0);
+  var diff = Math.round((today - target) / 86400000);
+  var wd = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  var dp = d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  if (diff===0) return '今天 · '+dp+' '+wd;
+  if (diff===1) return '昨天 · '+dp+' '+wd;
+  if (diff===-1) return '明天 · '+dp+' '+wd;
+  return dp+' '+wd;
+}
+
+// ==================== CALENDAR ====================
+function renderCalendar() {
+  document.getElementById('monthLabel').textContent = currentYear+'年 '+(currentMonth+1)+'月';
+  var dataMap = getDatesWithData();
+  var firstDay = new Date(currentYear, currentMonth, 1);
+  var lastDay = new Date(currentYear, currentMonth+1, 0);
+  var startDayOfWeek = firstDay.getDay();
+  var startOffset = startDayOfWeek===0 ? 6 : startDayOfWeek-1;
+  var totalDays = lastDay.getDate();
+  var todayStr = new Date().toISOString().slice(0,10);
+  var grid = document.getElementById('calGrid'), html = '';
+
+  var prevLastDay = new Date(currentYear, currentMonth, 0).getDate();
+  for (var i=startOffset-1; i>=0; i--) {
+    var d = prevLastDay - i;
+    html += '<div class="cal-cell other-month" data-date="'+fmtCalDate(currentYear,currentMonth-1,d)+'"><span class="day-num">'+d+'</span></div>';
+  }
+  for (var d=1; d<=totalDays; d++) {
+    var ds = fmtCalDate(currentYear, currentMonth, d);
+    var info = dataMap[ds];
+    var cls = 'cal-cell'; if (ds===todayStr) cls+=' today';
+    html += '<div class="'+cls+'" data-date="'+ds+'" onclick="openDetail(\''+ds+'\')">';
+    html += '<span class="day-num">'+d+'</span>';
+    if (info) { html+='<div class="cal-dots">'; if(info.training)html+='<span class="cal-dot training"></span>'; if(info.body)html+='<span class="cal-dot body"></span>'; if(info.diary)html+='<span class="cal-dot diary"></span>'; html+='</div>'; }
+    html += '</div>';
+  }
+  var remaining = 7 - ((startOffset+totalDays)%7);
+  if (remaining<7) { for(var nd=1; nd<=remaining; nd++) { html+='<div class="cal-cell other-month" data-date="'+fmtCalDate(currentYear,currentMonth+1,nd)+'"><span class="day-num">'+nd+'</span></div>'; } }
+  grid.innerHTML = html;
+  updateCalendarStats(dataMap);
+  updateTodayPreview();
+}
+function fmtCalDate(y,m,d) { var dt=new Date(y,m,d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function prevMonth() { if(currentMonth===0){currentMonth=11;currentYear--;}else{currentMonth--;} renderCalendar(); }
+function nextMonth() { if(currentMonth===11){currentMonth=0;currentYear++;}else{currentMonth++;} renderCalendar(); }
+function goCalendarToday() { var t=new Date(); currentMonth=t.getMonth(); currentYear=t.getFullYear(); renderCalendar(); }
+
+function getDatesWithData() {
+  var map={};
+  loadData('training').forEach(function(r){ if(!map[r.date])map[r.date]={training:false,body:false,diary:false}; map[r.date].training=true; });
+  loadData('body').forEach(function(r){ if(!map[r.date])map[r.date]={training:false,body:false,diary:false}; map[r.date].body=true; });
+  loadData('diary').forEach(function(r){ if(!map[r.date])map[r.date]={training:false,body:false,diary:false}; map[r.date].diary=true; });
+  return map;
+}
+function updateCalendarStats(dataMap) {
+  var prefix=currentYear+'-'+String(currentMonth+1).padStart(2,'0');
+  var training=loadData('training'); var diary=loadData('diary');
+  var trainDays=0, totalSets=0;
+  training.forEach(function(r){ if(r.date.indexOf(prefix)===0){ trainDays++; r.exercises.forEach(function(ex){ totalSets+=ex.sets?ex.sets.length:0; }); } });
+  var diaryCount=0; diary.forEach(function(r){ if(r.date.indexOf(prefix)===0) diaryCount++; });
+  document.getElementById('statTrainDays').textContent=trainDays;
+  document.getElementById('statSets').textContent=totalSets;
+  document.getElementById('statDiaries').textContent=diaryCount;
+}
+function updateTodayPreview() {
+  var todayStr=new Date().toISOString().slice(0,10);
+  var training=loadData('training').filter(function(r){return r.date===todayStr;});
+  var diary=loadData('diary').filter(function(r){return r.date===todayStr;});
+  var p=document.getElementById('todayPreview');
+  if(training.length===0&&diary.length===0){ p.innerHTML='<div style="font-size:14px;color:var(--text-muted)">📅 点击日历中的日期开始记录</div>'; return; }
+  var parts=[];
+  if(training.length>0){ var acts=[]; training.forEach(function(r){r.exercises.forEach(function(ex){acts.push(ex.name);});}); parts.push('🏋️ 训练: '+acts.join('、')); }
+  if(diary.length>0){ var ld=diary[diary.length-1]; var fe={'优秀':'😄','良好':'😊','一般':'😐','疲惫':'😫'}; parts.push('📝 感觉: '+(fe[ld.feeling]||'')+' '+ld.feeling); }
+  p.innerHTML='<div style="font-size:13px;">'+parts.join('<br>')+'</div>';
+}
+
+// ==================== DETAIL TABS ====================
+function switchDetailTab(tab) {
+  document.querySelectorAll('#page-detail .tab-btn').forEach(function(b){b.classList.remove('active');});
+  document.querySelectorAll('#page-detail .tab-content').forEach(function(c){c.classList.remove('active');});
+  document.getElementById('tabBtn-'+tab).classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='body') setTimeout(function(){drawWeightChart();},100);
+}
+function refreshDetailAll() {
+  refreshBodyHistory();
+  refreshDiaryHistory();
+}
+
+// ==================== TRAINING: Workout Editor ====================
+function loadWorkoutForDate() {
+  var records = loadData('training').filter(function(r){ return r.date===selectedDate; });
+  if (records.length > 0) {
+    // Load existing workout
+    workoutExercises = JSON.parse(JSON.stringify(records[0].exercises));
+    workoutExercises.forEach(function(ex, i) { ex._idx = i; });
+  } else {
+    workoutExercises = [];
+  }
+  renderWorkout();
+}
+
+function renderWorkout() {
+  var cardsEl = document.getElementById('exerciseCards');
+  var summaryEl = document.getElementById('muscleSummary');
+  var doneBtn = document.getElementById('doneBtn');
+  var addBtn = document.getElementById('addExBtn');
+  var quickAdd = document.getElementById('quickAdd');
+
+  // Hide quick add
+  quickAdd.style.display = 'none';
+
+  if (workoutExercises.length === 0) {
+    cardsEl.innerHTML = '<div class="empty-state"><div class="icon">🏋️</div><p>还没有训练动作</p><p style="font-size:12px;color:var(--text-muted)">点击下方按钮添加</p></div>';
+    summaryEl.innerHTML = '';
+    doneBtn.style.display = 'none';
+    addBtn.style.display = '';
+    return;
+  }
+
+  doneBtn.style.display = '';
+  addBtn.style.display = '';
+
+  // Muscle summary
+  var muscleMap = {};
+  workoutExercises.forEach(function(ex) {
+    var m = ex.muscle || '其他';
+    if (!muscleMap[m]) muscleMap[m] = { count: 0, totalSets: 0 };
+    muscleMap[m].count++;
+    muscleMap[m].totalSets += (ex.sets || []).length;
+  });
+
+  summaryEl.innerHTML = Object.keys(muscleMap).map(function(m) {
+    var info = MUSCLE_INFO[m] || MUSCLE_INFO['其他'];
+    var s = muscleMap[m];
+    return '<div class="muscle-tag"><span class="dot" style="background:'+info.color+'"></span>'+m+' <span class="count">'+s.count+'动作 · '+s.totalSets+'组</span></div>';
+  }).join('');
+
+  // Exercise cards
+  cardsEl.innerHTML = workoutExercises.map(function(ex, idx) {
+    var info = MUSCLE_INFO[ex.muscle] || MUSCLE_INFO['其他'];
+    var sets = ex.sets || [];
+    var setRows = sets.map(function(s, si) {
+      return '<div class="set-row">' +
+        '<span class="set-num">第'+(si+1)+'组</span>' +
+        '<div class="set-val">' +
+          '<span class="kg">'+s.weight+'</span><span class="kg-label">kg</span>' +
+          '<span class="times">×</span>' +
+          '<span class="reps-num">'+s.reps+'</span><span class="reps-label">次</span>' +
+        '</div>' +
+        '<button class="set-del" onclick="removeSet('+idx+','+si+')" title="删除此组">✕</button>' +
+      '</div>';
+    }).join('');
+
+    // Inline add-set form (always visible, supports infinite adding)
+    var addSetForm = '<div class="add-set-row">' +
+      '<span class="add-set-num">第'+(sets.length+1)+'组</span>' +
+      '<input type="number" id="newWeight_'+idx+'" class="add-set-input" placeholder="重量" min="0" onkeydown="if(event.key===\'Enter\'){document.getElementById(\'newReps_'+idx+'\').focus();}">' +
+      '<span class="add-set-label">kg</span>' +
+      '<span style="color:var(--accent);font-size:16px;font-weight:700;">×</span>' +
+      '<input type="number" id="newReps_'+idx+'" class="add-set-input" placeholder="次数" min="0" onkeydown="if(event.key===\'Enter\'){confirmAddSet('+idx+');}">' +
+      '<span class="add-set-label">次</span>' +
+      '<button class="add-set-btn" onclick="confirmAddSet('+idx+')">添加</button>' +
+    '</div>';
+
+    return '<div class="ex-card" style="border-left-color:'+info.color+';" data-ex-idx="'+idx+'">' +
+      '<div class="ex-top">' +
+        '<button class="toggle-arrow" onclick="toggleExerciseCard('+idx+')" title="展开/收起">▼</button>' +
+        '<div class="ex-icon" style="background:'+info.bg+';">'+info.icon+'</div>' +
+        '<div class="ex-info">' +
+          '<div class="ex-name">'+esc(ex.name)+'</div>' +
+          '<div class="ex-muscle"><span class="ex-muscle-dot" style="background:'+info.color+';"></span>'+ex.muscle+' · '+(sets.length||0)+'组</div>' +
+        '</div>' +
+        '<div class="ex-card-actions">' +
+          '<button onclick="removeExercise('+idx+')" title="删除动作">🗑</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sets-wrap">' + setRows + addSetForm + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function showQuickAdd() {
+  document.getElementById('quickAdd').style.display = '';
+  document.getElementById('qaName').value = '';
+  document.getElementById('qaMuscle').value = '';
+  document.getElementById('qaName').focus();
+}
+function cancelQuickAdd() {
+  document.getElementById('quickAdd').style.display = 'none';
+}
+function confirmAddExercise() {
+  var name = document.getElementById('qaName').value.trim();
+  var muscle = document.getElementById('qaMuscle').value || '其他';
+  if (!name) { alert('请输入动作名称'); return; }
+  workoutExercises.push({ name: name, muscle: muscle, sets: [] });
+  renderWorkout();
+}
+function removeExercise(idx) {
+  if (!confirm('确定删除「'+workoutExercises[idx].name+'」吗？')) return;
+  workoutExercises.splice(idx, 1);
+  renderWorkout();
+}
+function toggleExerciseCard(idx) {
+  var card = document.querySelector('.ex-card[data-ex-idx="'+idx+'"]');
+  if (!card) return;
+  var arrow = card.querySelector('.toggle-arrow');
+  var setsWrap = card.querySelector('.sets-wrap');
+  var isCollapsed = setsWrap.classList.contains('collapsed');
+  if (isCollapsed) {
+    setsWrap.classList.remove('collapsed');
+    arrow.classList.remove('open');
+  } else {
+    setsWrap.classList.add('collapsed');
+    arrow.classList.add('open');
+  }
+}
+function confirmAddSet(idx) {
+  var wEl = document.getElementById('newWeight_'+idx);
+  var rEl = document.getElementById('newReps_'+idx);
+  var w = parseFloat(wEl.value);
+  var r = parseInt(rEl.value);
+  if (isNaN(w) || isNaN(r)) { alert('请输入有效的重量和次数'); return; }
+  if (!workoutExercises[idx].sets) workoutExercises[idx].sets = [];
+  workoutExercises[idx].sets.push({ weight: w, reps: r });
+
+  // Insert new set row before the add-set row without full re-render
+  var addRow = wEl.closest('.add-set-row');
+  var exCard = addRow.closest('.ex-card');
+  var setsWrap = exCard.querySelector('.sets-wrap');
+  var setNum = workoutExercises[idx].sets.length;
+  var newRow = document.createElement('div');
+  newRow.className = 'set-row';
+  newRow.innerHTML = '<span class="set-num">第'+setNum+'组</span>' +
+    '<div class="set-val">' +
+      '<span class="kg">'+w+'</span><span class="kg-label">kg</span>' +
+      '<span class="times">×</span>' +
+      '<span class="reps-num">'+r+'</span><span class="reps-label">次</span>' +
+    '</div>' +
+    '<button class="set-del" onclick="removeSetInline(this,'+idx+','+(setNum-1)+')" title="删除此组">✕</button>';
+  setsWrap.insertBefore(newRow, addRow);
+
+  // Clear inputs and refocus weight for continuous adding
+  wEl.value = '';
+  rEl.value = '';
+  wEl.focus();
+
+  // Update muscle summary
+  updateMuscleSummary();
+
+  // Update the add row counter
+  var nextNum = setNum + 1;
+  var addNumEl = addRow.querySelector('.add-set-num');
+  if (addNumEl) addNumEl.textContent = '第'+nextNum+'组';
+}
+function removeSet(exIdx, setIdx) {
+  workoutExercises[exIdx].sets.splice(setIdx, 1);
+  renderWorkout();
+}
+// Inline remove set (used when adding continuously without re-render)
+function removeSetInline(btn, exIdx, setIdx) {
+  workoutExercises[exIdx].sets.splice(setIdx, 1);
+  // Rebuild just this exercise card to re-number sets
+  renderSingleExerciseCard(exIdx);
+  updateMuscleSummary();
+}
+function updateMuscleSummary() {
+  var summaryEl = document.getElementById('muscleSummary');
+  var muscleMap = {};
+  workoutExercises.forEach(function(ex) {
+    var m = ex.muscle || '其他';
+    if (!muscleMap[m]) muscleMap[m] = { count: 0, totalSets: 0 };
+    muscleMap[m].count++;
+    muscleMap[m].totalSets += (ex.sets || []).length;
+  });
+  summaryEl.innerHTML = Object.keys(muscleMap).map(function(m) {
+    var info = MUSCLE_INFO[m] || MUSCLE_INFO['其他'];
+    var s = muscleMap[m];
+    return '<div class="muscle-tag"><span class="dot" style="background:'+info.color+'"></span>'+m+' <span class="count">'+s.count+'动作 · '+s.totalSets+'组</span></div>';
+  }).join('');
+}
+function renderSingleExerciseCard(idx) {
+  var ex = workoutExercises[idx];
+  if (!ex) return;
+  var info = MUSCLE_INFO[ex.muscle] || MUSCLE_INFO['其他'];
+  var sets = ex.sets || [];
+  var setRows = sets.map(function(s, si) {
+    return '<div class="set-row">' +
+      '<span class="set-num">第'+(si+1)+'组</span>' +
+      '<div class="set-val">' +
+        '<span class="kg">'+s.weight+'</span><span class="kg-label">kg</span>' +
+        '<span class="times">×</span>' +
+        '<span class="reps-num">'+s.reps+'</span><span class="reps-label">次</span>' +
+      '</div>' +
+      '<button class="set-del" onclick="removeSet('+idx+','+si+')" title="删除此组">✕</button>' +
+    '</div>';
+  }).join('');
+  var addSetForm = '<div class="add-set-row">' +
+    '<span class="add-set-num">第'+(sets.length+1)+'组</span>' +
+    '<input type="number" id="newWeight_'+idx+'" class="add-set-input" placeholder="重量" min="0" onkeydown="if(event.key===\'Enter\'){document.getElementById(\'newReps_'+idx+'\').focus();}">' +
+    '<span class="add-set-label">kg</span>' +
+    '<span style="color:var(--accent);font-size:16px;font-weight:700;">×</span>' +
+    '<input type="number" id="newReps_'+idx+'" class="add-set-input" placeholder="次数" min="0" onkeydown="if(event.key===\'Enter\'){confirmAddSet('+idx+');}">' +
+    '<span class="add-set-label">次</span>' +
+    '<button class="add-set-btn" onclick="confirmAddSet('+idx+')">添加</button>' +
+  '</div>';
+  // Find and update this card
+  var cards = document.getElementById('exerciseCards').children;
+  var card = cards[idx];
+  if (card) {
+    var setsWrap = card.querySelector('.sets-wrap');
+    if (setsWrap) setsWrap.innerHTML = setRows + addSetForm;
+    // Update ex-muscle count
+    var exMuscle = card.querySelector('.ex-muscle');
+    if (exMuscle) exMuscle.innerHTML = '<span class="ex-muscle-dot" style="background:'+info.color+';"></span>'+ex.muscle+' · '+(sets.length||0)+'组';
+  }
+}
+
+function saveWorkout() {
+  if (workoutExercises.length === 0) { alert('请至少添加一个训练动作'); return; }
+  var valid = workoutExercises.every(function(ex) { return (ex.sets||[]).length > 0; });
+  if (!valid) { alert('每个动作请至少添加一组训练数据'); return; }
+
+  var records = loadData('training');
+  // Remove existing records for this date
+  records = records.filter(function(r) { return r.date !== selectedDate; });
+  records.push({ id: genId(), date: selectedDate, exercises: JSON.parse(JSON.stringify(workoutExercises)) });
+  saveData('training', records);
+  workoutExercises = [];
+  loadWorkoutForDate();
+  renderCalendar();
+  // Show brief success feedback
+  var btn = document.getElementById('doneBtn');
+  var orig = btn.textContent;
+  btn.textContent = '✅ 已保存！';
+  btn.style.background = 'var(--success)';
+  setTimeout(function() { btn.textContent = orig; btn.style.background = 'var(--accent)'; }, 1500);
+}
+
+// ==================== BODY DATA ====================
+function saveBody() {
+  var w = document.getElementById('bodyWeight').value.trim();
+  if (!w) { alert('请至少填写体重'); return; }
+  var editId = document.getElementById('bodyEditId').value;
+  var records = loadData('body');
+  function gv(id) { var v=document.getElementById(id).value.trim(); return v?parseFloat(v):null; }
+  var record = { id:editId||genId(), date:selectedDate, weight:parseFloat(w),
+    measurements:{ chest:gv('bodyChest'),waist:gv('bodyWaist'),hip:gv('bodyHip'),
+    leftArm:gv('bodyLeftArm'),rightArm:gv('bodyRightArm'),leftThigh:gv('bodyLeftThigh'),rightThigh:gv('bodyRightThigh') } };
+  if(editId){ var idx=records.findIndex(function(r){return r.id===editId;}); if(idx>=0)records[idx]=record; }
+  else{ records.push(record); }
+  saveData('body',records); clearBodyForm(); refreshBodyHistory(); drawWeightChart(); renderCalendar();
+}
+function clearBodyForm() {
+  ['bodyWeight','bodyChest','bodyWaist','bodyHip','bodyLeftArm','bodyRightArm','bodyLeftThigh','bodyRightThigh'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('bodyEditId').value=''; document.getElementById('bodyFormTitle').textContent='记录身体数据'; document.getElementById('cancelBodyEdit').style.display='none';
+}
+function cancelBodyEdit(){clearBodyForm();}
+function editBody(id){
+  var r=loadData('body').find(function(rr){return rr.id===id;}); if(!r)return;
+  document.getElementById('bodyEditId').value=id; document.getElementById('bodyFormTitle').textContent='✏️ 编辑身体数据'; document.getElementById('cancelBodyEdit').style.display='';
+  document.getElementById('bodyWeight').value=r.weight;
+  if(r.measurements){ Object.keys(r.measurements).forEach(function(k){var el=document.getElementById('body'+k[0].toUpperCase()+k.slice(1));if(el&&r.measurements[k]!==null)el.value=r.measurements[k];}); }
+  document.querySelector('#tab-body .card').scrollIntoView({behavior:'smooth'}); switchDetailTab('body');
+}
+function deleteBody(id){ if(!confirm('确定删除？'))return; saveData('body',loadData('body').filter(function(r){return r.id!==id;})); refreshBodyHistory(); drawWeightChart(); renderCalendar(); }
+function refreshBodyHistory(){
+  var c=document.getElementById('bodyHistory'); var records=loadData('body').filter(function(r){return r.date===selectedDate;}).sort(function(a,b){return b.id.localeCompare(a.id);});
+  if(records.length===0){ c.innerHTML='<div class="empty-state"><div class="icon">📊</div><p>该日期暂无身体数据</p></div>'; return; }
+  var labels={chest:'胸围',waist:'腰围',hip:'臀围',leftArm:'左臂',rightArm:'右臂',leftThigh:'左腿',rightThigh:'右腿'};
+  c.innerHTML=records.map(function(r){ var m=r.measurements||{}; var parts=['⚖️ 体重: <strong>'+r.weight+'kg</strong>'];
+    Object.keys(labels).forEach(function(k){if(m[k]!=null)parts.push(labels[k]+': '+m[k]+'cm');});
+    return '<div class="history-item"><div class="date-label">📊 身体数据</div><div class="summary">'+parts.join(' · ')+'</div><div class="actions"><button class="btn btn-sm" onclick="editBody(\''+r.id+'\')">✏️ 编辑</button><button class="btn btn-sm btn-danger" onclick="deleteBody(\''+r.id+'\')">🗑 删除</button></div></div>';
+  }).join('');
+}
+
+function drawWeightChart(){
+  var container=document.getElementById('weightChartContainer'), canvas=document.getElementById('weightChart');
+  var records=loadData('body').sort(function(a,b){return a.date.localeCompare(b.date);});
+  if(records.length<2){container.style.display=records.length===0?'none':''; return;}
+  container.style.display=''; var ctx=canvas.getContext('2d'), dpr=window.devicePixelRatio||1;
+  var rect=canvas.parentElement.getBoundingClientRect(), w=rect.width-32, h=200;
+  canvas.width=w*dpr; canvas.height=h*dpr; canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr); ctx.clearRect(0,0,w,h);
+  var pad={top:20,right:16,bottom:40,left:50}, pw=w-pad.left-pad.right, ph=h-pad.top-pad.bottom;
+  var weights=records.map(function(r){return r.weight;});
+  var minW=Math.floor(Math.min.apply(null,weights)-1), maxW=Math.ceil(Math.max.apply(null,weights)+1);
+  if(maxW-minW<4){var mid=(maxW+minW)/2;minW=mid-3;maxW=mid+3;}
+  function xs(i){return pad.left+(i/Math.max(records.length-1,1))*pw;}
+  function ys(v){return pad.top+ph-((v-minW)/(maxW-minW))*ph;}
+  ctx.strokeStyle='#2a3a5c';ctx.lineWidth=0.5;
+  for(var i=0;i<=5;i++){var y=pad.top+(i/5)*ph,val=maxW-(i/5)*(maxW-minW);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.stroke();ctx.fillStyle='#8899aa';ctx.font='11px -apple-system,sans-serif';ctx.textAlign='right';ctx.fillText(val.toFixed(1),pad.left-8,y+4);}
+  ctx.textAlign='center';var se=Math.max(1,Math.floor(records.length/6));
+  records.forEach(function(r,i){if(i%se===0||i===records.length-1){var x=xs(i),d=new Date(r.date+'T00:00:00');ctx.fillText((d.getMonth()+1)+'/'+d.getDate(),x,h-pad.bottom+20);ctx.strokeStyle='#2a3a5c';ctx.beginPath();ctx.moveTo(x,h-pad.bottom);ctx.lineTo(x,h-pad.bottom+5);ctx.stroke();}});
+  ctx.strokeStyle='#ff6b35';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.beginPath();
+  records.forEach(function(r,i){var x=xs(i),y=ys(r.weight);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}); ctx.stroke();
+  records.forEach(function(r,i){var x=xs(i),y=ys(r.weight);ctx.fillStyle='#ff6b35';ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1a1a2e';ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e0e0e0';ctx.font='10px -apple-system,sans-serif';ctx.textAlign='center';ctx.fillText(r.weight+'kg',x,y-10);});
+  ctx.strokeStyle='#8899aa';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.left,pad.top);ctx.lineTo(pad.left,h-pad.bottom);ctx.lineTo(w-pad.right,h-pad.bottom);ctx.stroke();
+}
+
+// ==================== DIARY ====================
+var diaryCompleted=true, diaryFeeling='良好';
+function toggleCompleted(){diaryCompleted=!diaryCompleted;document.getElementById('diaryCompleted').classList.toggle('on',diaryCompleted);document.getElementById('diaryCompletedLabel').textContent=diaryCompleted?'已完成训练 ✓':'未完成训练';}
+function selectFeeling(btn){document.querySelectorAll('#feelingGroup .feeling-btn').forEach(function(b){b.classList.remove('selected');});btn.classList.add('selected');diaryFeeling=btn.dataset.feeling;}
+function saveDiary(){
+  var progress=document.getElementById('diaryProgress').value.trim(), thoughts=document.getElementById('diaryThoughts').value.trim();
+  if(!progress&&!thoughts){alert('请至少填写"今日进步"或"今日感想"');return;}
+  var editId=document.getElementById('diaryEditId').value, records=loadData('diary');
+  var entry={id:editId||genId(),date:selectedDate,completed:diaryCompleted,feeling:diaryFeeling,progress:progress,thoughts:thoughts};
+  if(editId){var idx=records.findIndex(function(r){return r.id===editId;});if(idx>=0)records[idx]=entry;}else{records.push(entry);}
+  saveData('diary',records); clearDiaryForm(); refreshDiaryHistory(); renderCalendar();
+}
+function clearDiaryForm(){
+  document.getElementById('diaryEditId').value='';document.getElementById('diaryFormTitle').textContent='写日记';
+  document.getElementById('cancelDiaryEdit').style.display='none';document.getElementById('diaryProgress').value='';
+  document.getElementById('diaryThoughts').value='';diaryCompleted=true;
+  document.getElementById('diaryCompleted').classList.add('on');document.getElementById('diaryCompletedLabel').textContent='已完成训练 ✓';
+  diaryFeeling='良好';document.querySelectorAll('#feelingGroup .feeling-btn').forEach(function(b){b.classList.remove('selected');});
+  var gb=document.querySelector('#feelingGroup .feeling-btn[data-feeling="良好"]');if(gb)gb.classList.add('selected');
+}
+function cancelDiaryEdit(){clearDiaryForm();}
+function editDiary(id){
+  var r=loadData('diary').find(function(rr){return rr.id===id;});if(!r)return;
+  document.getElementById('diaryEditId').value=id;document.getElementById('diaryFormTitle').textContent='✏️ 编辑日记';document.getElementById('cancelDiaryEdit').style.display='';
+  document.getElementById('diaryProgress').value=r.progress||'';document.getElementById('diaryThoughts').value=r.thoughts||'';
+  diaryCompleted=r.completed!==false;document.getElementById('diaryCompleted').classList.toggle('on',diaryCompleted);
+  document.getElementById('diaryCompletedLabel').textContent=diaryCompleted?'已完成训练 ✓':'未完成训练';
+  diaryFeeling=r.feeling||'良好';document.querySelectorAll('#feelingGroup .feeling-btn').forEach(function(b){b.classList.toggle('selected',b.dataset.feeling===diaryFeeling);});
+  document.querySelector('#tab-diary .card').scrollIntoView({behavior:'smooth'});switchDetailTab('diary');
+}
+function deleteDiary(id){if(!confirm('确定删除？'))return;saveData('diary',loadData('diary').filter(function(r){return r.id!==id;}));refreshDiaryHistory();renderCalendar();}
+function refreshDiaryHistory(){
+  var c=document.getElementById('diaryHistory');var records=loadData('diary').filter(function(r){return r.date===selectedDate;}).sort(function(a,b){return b.id.localeCompare(a.id);});
+  if(records.length===0){c.innerHTML='<div class="empty-state"><div class="icon">📝</div><p>该日期还没有日记</p></div>';return;}
+  var fe={'优秀':'😄','良好':'😊','一般':'😐','疲惫':'😫'};
+  c.innerHTML=records.map(function(r){return'<div class="diary-card"><div class="diary-date">📝 日记</div><div class="diary-meta"><span>'+(r.completed!==false?'✅ 已完成':'❌ 未完成')+'</span><span>'+(fe[r.feeling]||'😊')+' '+r.feeling+'</span></div>'+(r.progress?'<div class="diary-section"><div class="label">💪 今日进步</div><div class="content">'+esc(r.progress)+'</div></div>':'')+(r.thoughts?'<div class="diary-section"><div class="label">💭 今日感想</div><div class="content">'+esc(r.thoughts)+'</div></div>':'')+'<div class="actions" style="margin-top:12px;"><button class="btn btn-sm" onclick="editDiary(\''+r.id+'\')">✏️ 编辑</button><button class="btn btn-sm btn-danger" onclick="deleteDiary(\''+r.id+'\')">🗑 删除</button></div></div>';}).join('');
+}
+
+// ==================== UTILS ====================
+function esc(str) { var d=document.createElement('div'); d.textContent=str||''; return d.innerHTML; }
+
+// ==================== INIT ====================
+function init() {
+  renderCalendar();
+  var gb=document.querySelector('#feelingGroup .feeling-btn[data-feeling="良好"]'); if(gb)gb.classList.add('selected');
+  window.addEventListener('resize',function(){var at=document.querySelector('#page-detail .tab-content.active');if(at&&at.id==='tab-body')drawWeightChart();});
+}
+init();
+</script>
+</body>
+</html>
