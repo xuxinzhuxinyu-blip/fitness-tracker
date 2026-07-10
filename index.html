@@ -40,9 +40,14 @@
     will-change: transform; padding-bottom: 40px;
   }
   #page-calendar { transform: translateX(0); z-index:1; }
-  #page-detail  { transform: translateX(100%); z-index:2; }
-  body.on-detail #page-calendar { transform: translateX(-100%); pointer-events:none; }
-  body.on-detail #page-detail  { transform: translateX(0); }
+  #page-mode     { transform: translateX(100%); z-index:3; }
+  #page-detail   { transform: translateX(100%); z-index:2; }
+
+  body.on-mode #page-calendar { transform: translateX(-100%); pointer-events:none; }
+  body.on-mode #page-mode     { transform: translateX(0); }
+
+  body.on-detail #page-mode   { transform: translateX(-100%); pointer-events:none; }
+  body.on-detail #page-detail { transform: translateX(0); }
 
   /* ==================== Calendar Page ==================== */
   .cal-header { padding:20px 16px 12px; text-align:center; position:sticky; top:0; z-index:10; background:linear-gradient(180deg, var(--bg) 60%, transparent); }
@@ -75,6 +80,35 @@
   .cal-legend { max-width:500px; margin:12px auto 0; padding:0 16px; display:flex; gap:16px; justify-content:center; font-size:11px; color:var(--text-muted); }
   .cal-legend span { display:flex; align-items:center; gap:4px; }
   .cal-legend .leg-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+  /* ==================== Mode Selection Page ==================== */
+  .mode-header {
+    display:flex; align-items:center; gap:12px;
+    padding:14px 16px; position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg, var(--bg) 60%, transparent);
+  }
+  .mode-title { font-size:20px; font-weight:700; }
+  .mode-subtitle { font-size:13px; color:var(--text-muted); margin-top:4px; }
+
+  .mode-grid {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:12px; max-width:500px; margin:16px auto; padding:0 16px;
+  }
+  .mode-card {
+    background:var(--bg-card); border-radius:var(--radius);
+    padding:20px 16px; text-align:center; cursor:pointer;
+    border:2px solid var(--border); transition:all 0.2s;
+    -webkit-tap-highlight-color:transparent; user-select:none;
+  }
+  .mode-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  .mode-card:active { transform:scale(0.96); }
+  .mode-card .mode-icon {
+    width:56px; height:56px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 12px; font-size:28px;
+  }
+  .mode-card .mode-name { font-size:15px; font-weight:700; margin-bottom:6px; }
+  .mode-card .mode-desc { font-size:12px; color:var(--text-muted); line-height:1.5; }
 
   /* ==================== Detail Page Header ==================== */
   .detail-header {
@@ -369,7 +403,49 @@
   </div>
 </div>
 
-<!-- ==================== PAGE 2: DETAIL ==================== -->
+<!-- ==================== PAGE 2: MODE SELECTION ==================== -->
+<div class="page" id="page-mode">
+  <div class="mode-header">
+    <button class="back-btn" onclick="goBackFromMode()">←</button>
+    <div>
+      <div class="mode-title">选择训练模式</div>
+      <div class="mode-subtitle" id="modeDateLabel"></div>
+    </div>
+  </div>
+
+  <div class="mode-grid">
+    <div class="mode-card" onclick="selectMode('normal')" style="border-left:3px solid var(--blue);">
+      <div class="mode-icon" style="background:rgba(74,144,217,0.15);">🎯</div>
+      <div class="mode-name">普通组</div>
+      <div class="mode-desc">固定重量训练<br>每组重量保持不变</div>
+    </div>
+
+    <div class="mode-card" onclick="selectMode('pyramid-up')" style="border-left:3px solid #4caf84;">
+      <div class="mode-icon" style="background:rgba(76,175,132,0.15);">📈</div>
+      <div class="mode-name">递增组</div>
+      <div class="mode-desc">重量逐渐增加<br>每组比上一组更重</div>
+    </div>
+
+    <div class="mode-card" onclick="selectMode('pyramid-down')" style="border-left:3px solid #e07b4c;">
+      <div class="mode-icon" style="background:rgba(224,123,76,0.15);">📉</div>
+      <div class="mode-name">递减组</div>
+      <div class="mode-desc">重量逐渐降低<br>每组比上一组更轻</div>
+    </div>
+
+    <div class="mode-card" onclick="selectMode('superset')" style="border-left:3px solid #d4a843;">
+      <div class="mode-icon" style="background:rgba(212,168,67,0.15);">⚡</div>
+      <div class="mode-name">超级组</div>
+      <div class="mode-desc">两个动作连续完成<br>中间不休息</div>
+    </div>
+  </div>
+
+  <div style="max-width:500px;margin:20px auto 0;padding:0 16px;display:flex;gap:8px;">
+    <button class="btn btn-sm" onclick="selectModeAndTab('body')" style="flex:1;padding:12px;">📊 身体数据</button>
+    <button class="btn btn-sm" onclick="selectModeAndTab('diary')" style="flex:1;padding:12px;">📝 成长日记</button>
+  </div>
+</div>
+
+<!-- ==================== PAGE 3: DETAIL ==================== -->
 <div class="page" id="page-detail">
   <div class="detail-header">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -384,6 +460,12 @@
   <!-- ===== TAB: TRAINING (New Design) ===== -->
   <div class="tab-content active" id="tab-training">
     <div class="train-main">
+      <!-- Mode badge -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span id="modeBadge" style="background:rgba(255,107,53,0.15);color:var(--accent);padding:6px 14px;border-radius:16px;font-size:13px;font-weight:600;"></span>
+        <span style="font-size:12px;color:var(--text-muted);">训练模式</span>
+      </div>
+
       <!-- Muscle group summary -->
       <div class="muscle-summary" id="muscleSummary"></div>
 
@@ -533,19 +615,54 @@ var selectedDate = new Date().toISOString().slice(0,10);
 var currentMonth = new Date().getMonth();
 var currentYear = new Date().getFullYear();
 var workoutExercises = []; // In-memory workout being edited: [{id,name,muscle,sets:[{weight,reps}]}]
+var selectedMode = 'normal'; // 'normal' | 'pyramid-up' | 'pyramid-down' | 'superset'
+
+var MODE_LABELS = {
+  'normal': '🏋️ 普通组',
+  'pyramid-up': '📈 递增组',
+  'pyramid-down': '📉 递减组',
+  'superset': '⚡ 超级组'
+};
 
 function openDetail(dateStr) {
   selectedDate = dateStr;
-  document.getElementById('detailDateLabel').textContent = formatDateLong(dateStr);
+  // First show mode selection
+  document.getElementById('modeDateLabel').textContent = formatDateLong(dateStr);
+  document.body.classList.remove('on-detail');
+  document.body.classList.add('on-mode');
+}
+
+function selectMode(mode) {
+  selectedMode = mode;
+  document.getElementById('detailDateLabel').textContent = formatDateLong(selectedDate);
+  document.body.classList.remove('on-mode');
   document.body.classList.add('on-detail');
   switchDetailTab('training');
   loadWorkoutForDate();
   refreshDetailAll();
   setTimeout(function(){ drawWeightChart(); }, 200);
 }
-function goBack() {
-  document.body.classList.remove('on-detail');
+
+function selectModeAndTab(tab) {
+  selectedMode = 'normal';
+  document.getElementById('detailDateLabel').textContent = formatDateLong(selectedDate);
+  document.body.classList.remove('on-mode');
+  document.body.classList.add('on-detail');
+  switchDetailTab(tab);
+  loadWorkoutForDate();
+  refreshDetailAll();
+  setTimeout(function(){ drawWeightChart(); }, 200);
+}
+
+function goBackFromMode() {
+  document.body.classList.remove('on-mode');
   renderCalendar();
+}
+
+function goBack() {
+  // Go back from detail to mode selection
+  document.body.classList.remove('on-detail');
+  document.body.classList.add('on-mode');
 }
 
 // ==================== DATE FORMAT ====================
@@ -645,7 +762,7 @@ function refreshDetailAll() {
 function loadWorkoutForDate() {
   var records = loadData('training').filter(function(r){ return r.date===selectedDate; });
   if (records.length > 0) {
-    // Load existing workout
+    // Load existing workout (mode is already set by selectMode or the saved record)
     workoutExercises = JSON.parse(JSON.stringify(records[0].exercises));
     workoutExercises.forEach(function(ex, i) { ex._idx = i; });
   } else {
@@ -660,6 +777,10 @@ function renderWorkout() {
   var doneBtn = document.getElementById('doneBtn');
   var addBtn = document.getElementById('addExBtn');
   var quickAdd = document.getElementById('quickAdd');
+
+  // Update mode badge
+  var badge = document.getElementById('modeBadge');
+  if (badge) badge.textContent = MODE_LABELS[selectedMode] || MODE_LABELS['normal'];
 
   // Hide quick add
   quickAdd.style.display = 'none';
@@ -878,7 +999,7 @@ function saveWorkout() {
   var records = loadData('training');
   // Remove existing records for this date
   records = records.filter(function(r) { return r.date !== selectedDate; });
-  records.push({ id: genId(), date: selectedDate, exercises: JSON.parse(JSON.stringify(workoutExercises)) });
+  records.push({ id: genId(), date: selectedDate, mode: selectedMode, exercises: JSON.parse(JSON.stringify(workoutExercises)) });
   saveData('training', records);
   workoutExercises = [];
   loadWorkoutForDate();
