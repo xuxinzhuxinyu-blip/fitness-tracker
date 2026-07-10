@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>健身训练</title>
+<style>
+:root {
+  --bg: #000000;
+  --card-bg: #111112;
+  --accent: #ff2d55;
+  --accent-glow: #ff1744;
+  --text: #ffffff;
+  --text-secondary: #8e8e93;
+  --separator: #1c1c1e;
+  --sf: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: var(--sf);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh; height: 100dvh;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  position: fixed; top:0; left:0; width:100%; height:100%;
+  height: 100dvh;
+  transition: transform 0.5s cubic-bezier(0.25,0.1,0.25,1), opacity 0.5s ease;
+  will-change: transform, opacity;
+}
+
+/* ============ Main Page ============ */
+#page-main { display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+/* Status bar spacer */
+.status-bar { height: 54px; width: 100%; flex-shrink: 0; }
+
+/* Nav row */
+.nav-row {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: center; padding: 0 20px; margin-bottom: 8px;
+}
+.nav-row .icon-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); border: none;
+  color: #fff; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.nav-row .nav-title { font-size: 15px; font-weight: 600; letter-spacing: 0.3px; }
+.nav-row .nav-subtitle { font-size: 13px; color: var(--text-secondary); }
+
+/* Heart container */
+.heart-container {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  position: relative; width: 100%;
+  padding: 0 20px;
+}
+
+/* Heart canvas - 3D heart rendering */
+#heartCanvas {
+  width: 220px; height: 220px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ECG waveform */
+.ecg-container {
+  width: 100%; max-width: 340px;
+  height: 80px; margin-top: -10px;
+}
+#ecgCanvas {
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* Heart rate display */
+.hr-display {
+  display: flex; align-items: baseline; gap: 4px;
+  margin-top: 8px;
+}
+.hr-value {
+  font-size: 56px; font-weight: 200;
+  letter-spacing: -2px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--sf);
+}
+.hr-unit { font-size: 15px; color: var(--accent); font-weight: 500; }
+
+/* Status label */
+.status-label {
+  font-size: 13px; color: var(--text-secondary);
+  margin-top: 6px; letter-spacing: 0.5px;
+}
+.status-label .dot {
+  display: inline-block; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--accent);
+  margin-right: 6px; vertical-align: middle;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+@keyframes dotPulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:0.4; transform:scale(0.7); }
+}
+
+/* Long press hint */
+.hint-text {
+  font-size: 12px; color: rgba(255,255,255,0.25);
+  margin-top: 24px; letter-spacing: 0.8px;
+  transition: opacity 0.8s;
+}
+.hint-text.fading { opacity: 0; }
+
+/* Long press progress ring */
+.press-ring {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 260px; height: 260px;
+  pointer-events: none;
+}
+.press-ring circle {
+  fill: none; stroke: var(--accent);
+  stroke-width: 3; stroke-linecap: round;
+  stroke-dasharray: 816; stroke-dashoffset: 816;
+  transition: stroke-dashoffset 0.1s linear;
+  opacity: 0;
+}
+.press-ring.active circle { opacity: 1; }
+
+/* Bottom stats */
+.bottom-stats {
+  display: flex; gap: 0; width: 100%;
+  max-width: 340px; padding: 0 16px 34px;
+}
+.stat-item {
+  flex: 1; text-align: center;
+}
+.stat-value {
+  font-size: 20px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font-size: 11px; color: var(--text-secondary);
+  margin-top: 2px; letter-spacing: 0.3px;
+}
+
+/* ============ Log Page ============ */
+#page-log {
+  transform: translateY(100%);
+  opacity: 0;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+}
+body.on-log #page-main {
+  transform: scale(0.92);
+  opacity: 0.4;
+  pointer-events: none;
+}
+body.on-log #page-log {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.log-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 60px 20px 16px;
+}
+.log-header .close-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); border: none;
+  color: #fff; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.log-title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.log-date { font-size: 13px; color: var(--text-secondary); margin-left: auto; }
+
+/* Quick mode selector */
+.quick-modes {
+  display: flex; gap: 10px; padding: 4px 20px 16px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.quick-modes::-webkit-scrollbar { display: none; }
+.qm-chip {
+  flex-shrink: 0; padding: 10px 18px;
+  border-radius: 20px; border: 1px solid var(--separator);
+  background: transparent; color: var(--text-secondary);
+  font-size: 14px; font-family: var(--sf); cursor: pointer;
+  transition: all 0.2s;
+}
+.qm-chip.active {
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; font-weight: 600;
+}
+
+/* Log content */
+.log-scroll {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 0 20px 120px;
+}
+.log-section {
+  margin-bottom: 28px;
+}
+.log-section-title {
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+}
+/* Exercise card */
+.ex-card-log {
+  background: var(--card-bg); border-radius: 16px;
+  padding: 16px; margin-bottom: 10px;
+  border: 1px solid var(--separator);
+}
+.ex-card-log .ex-top-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.ex-card-log .ex-icon-sm {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.ex-card-log .ex-name-sm { font-size: 15px; font-weight: 600; flex:1; }
+.ex-card-log .ex-sets-info { font-size: 12px; color: var(--text-secondary); }
+/* Set row in log */
+.set-row-log {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.03); border-radius: 10px;
+}
+.set-row-log .set-idx { font-size: 12px; color: var(--text-secondary); width: 36px; }
+.set-row-log .set-input {
+  flex: 1; background: transparent; border: 1px solid var(--separator);
+  border-radius: 8px; padding: 10px 12px; color: #fff;
+  font-size: 15px; font-family: var(--sf); text-align: center;
+  -webkit-appearance: none; width: 0; min-width: 0;
+}
+.set-row-log .set-input:focus { outline: none; border-color: var(--accent); }
+.set-row-log .set-mult { color: var(--text-secondary); font-size: 14px; flex-shrink: 0; }
+.add-set-btn-log {
+  width: 100%; padding: 12px; background: transparent;
+  border: 1px dashed var(--separator); border-radius: 12px;
+  color: var(--text-secondary); font-size: 14px; font-family: var(--sf);
+  cursor: pointer; margin-top: 6px;
+}
+.add-set-btn-log:active { background: rgba(255,255,255,0.03); }
+
+/* Add exercise */
+.add-ex-btn-log {
+  width: 100%; padding: 14px; background: transparent;
+  border: 1px dashed var(--separator); border-radius: 14px;
+  color: var(--text-secondary); font-size: 15px; font-family: var(--sf);
+  cursor: pointer;
+}
+
+/* Save FAB */
+.save-fab {
+  position: fixed; bottom: 34px; left: 20px; right: 20px;
+  padding: 16px; background: var(--accent); color: #fff;
+  border: none; border-radius: 16px; font-size: 17px;
+  font-weight: 600; font-family: var(--sf); cursor: pointer;
+  box-shadow: 0 8px 32px rgba(255,45,85,0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  z-index: 100;
+}
+.save-fab:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(255,45,85,0.3); }
+
+/* Toast */
+.toast {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  background: rgba(255,255,255,0.95); color: #000;
+  padding: 12px 24px; border-radius: 20px; font-size: 14px;
+  font-weight: 600; font-family: var(--sf); z-index: 200;
+  opacity:0; transition: opacity 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- ============ MAIN PAGE ============ -->
+<div class="page" id="page-main">
+  <div class="status-bar"></div>
+
+  <div class="nav-row">
+    <button class="icon-btn">⚙</button>
+    <div style="text-align:center;">
+      <div class="nav-title">健身训练</div>
+      <div class="nav-subtitle" id="todayLabel"></div>
+    </div>
+    <button class="icon-btn">👤</button>
+  </div>
+
+  <!-- Heart + ECG area -->
+  <div class="heart-container" id="heartContainer">
+    <canvas id="heartCanvas" width="440" height="440"></canvas>
+
+    <!-- Long press ring -->
+    <svg class="press-ring" id="pressRing" viewBox="0 0 260 260">
+      <circle cx="130" cy="130" r="130"></circle>
+    </svg>
+
+    <div class="ecg-container">
+      <canvas id="ecgCanvas" width="680" height="160"></canvas>
+    </div>
+
+    <div class="hr-display">
+      <span class="hr-value" id="hrValue">72</span>
+      <span class="hr-unit">BPM</span>
+    </div>
+    <div class="status-label">
+      <span class="dot"></span>长按心脏进入训练日志
+    </div>
+    <div class="hint-text" id="hintText">按住中心心脏 · 3秒解锁</div>
+  </div>
+
+  <!-- Bottom stats -->
+  <div class="bottom-stats">
+    <div class="stat-item">
+      <div class="stat-value" id="statWorkouts">0</div>
+      <div class="stat-label">本月训练</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statSets">0</div>
+      <div class="stat-label">完成组数</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statStreak">0</div>
+      <div class="stat-label">连续天数</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LOG PAGE ============ -->
+<div class="page" id="page-log">
+  <div class="log-header">
+    <button class="close-btn" onclick="closeLog()">✕</button>
+    <span class="log-title">训练日志</span>
+    <span class="log-date" id="logDate"></span>
+  </div>
+
+  <div class="quick-modes" id="quickModes">
+    <button class="qm-chip active" data-mode="normal" onclick="setLogMode('normal', this)">普通组</button>
+    <button class="qm-chip" data-mode="pyramid-up" onclick="setLogMode('pyramid-up', this)">递增组</button>
+    <button class="qm-chip" data-mode="pyramid-down" onclick="setLogMode('pyramid-down', this)">递减组</button>
+    <button class="qm-chip" data-mode="superset" onclick="setLogMode('superset', this)">超级组</button>
+  </div>
+
+  <div class="log-scroll" id="logContent"></div>
+
+  <button class="save-fab" onclick="saveLog()">保存训练记录</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== 3D Heart Rendering ====================
+(function() {
+  var canvas = document.getElementById('heartCanvas');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var cx = W/2, cy = H/2;
+  var time = 0;
+  var beatPhase = 0;
+  var beatStrength = 0;
+  var targetBeat = 0;
+  var bpm = 72;
+  var beatInterval = 60 / bpm * 1000;
+  var lastBeat = Date.now();
+  var beatCount = 0;
+
+  // Precompute heart surface (3D points via parametric equations)
+  function heartPoint(u, v) {
+    // u: 0..PI, v: 0..2PI
+    var scale = 1.0;
+    var x = 16 * Math.pow(Math.sin(u), 3);
+    var y = 13 * Math.cos(u) - 5 * Math.cos(2*u) - 2 * Math.cos(3*u) - Math.cos(4*u);
+    // Rotate around Y axis using v
+    var cosV = Math.cos(v), sinV = Math.sin(v);
+    var x3 = x * cosV;
+    var z3 = x * sinV;
+    var y3 = y;
+    return { x: x3 * 6, y: y3 * 6 + 5, z: z3 * 6 };
+  }
+
+  function drawHeart(t) {
+    ctx.clearRect(0, 0, W, H);
+
+    var pulse = 1 + beatStrength * 0.08;
+    var beatDecay = Math.exp(-beatPhase * 5);
+
+    // Draw multiple depth layers
+    var layers = 18;
+    for (var li = 0; li < layers; li++) {
+      var v = (li / layers) * Math.PI * 2;
+      var cosV = Math.cos(v), sinV = Math.sin(v);
+
+      var grad = ctx.createLinearGradient(cx - 90, cy - 60, cx + 90, cy + 80);
+      var intensity = 0.3 + 0.7 * (1 - Math.abs(v - Math.PI) / Math.PI);
+      var r = Math.floor(210 + 45 * intensity * (1 + beatStrength * 0.4));
+      var g = Math.floor(30 + 20 * intensity);
+      var b = Math.floor(50 + 30 * intensity);
+      grad.addColorStop(0, 'rgba('+r+','+g+','+b+',1)');
+      grad.addColorStop(0.5, 'rgba('+Math.floor(r*0.85)+','+Math.floor(g*0.7)+','+Math.floor(b*0.7)+',0.9)');
+      grad.addColorStop(1, 'rgba('+Math.floor(r*0.65)+','+Math.floor(g*0.3)+','+Math.floor(b*0.4)+',0.7)');
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = 'rgba('+r+','+g+','+b+',0.6)';
+      ctx.lineWidth = 1.5;
+
+      ctx.beginPath();
+      var first = true;
+      for (var ui = 0; ui <= 40; ui++) {
+        var u = (ui / 40) * Math.PI;
+        var pt = heartPoint(u, v);
+        var scale = pulse * (1 + beatDecay * 0.05 * Math.sin(u * 3));
+        var px = cx + pt.x * scale * (1 + cosV * 0.15);
+        var py = cy - pt.y * scale;
+        if (first) { ctx.moveTo(px, py); first = false; }
+        else { ctx.lineTo(px, py); }
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      if (li % 3 === 0) {
+        ctx.strokeStyle = 'rgba('+r+','+Math.floor(g*1.2)+','+Math.floor(b*1.2)+',0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
+    // Highlight / specular
+    var hlGrad = ctx.createRadialGradient(cx - 25, cy - 60, 10, cx + 20, cy - 20, 90 * pulse);
+    hlGrad.addColorStop(0, 'rgba(255,255,255,0.25)');
+    hlGrad.addColorStop(0.4, 'rgba(255,200,200,0.08)');
+    hlGrad.addColorStop(1, 'rgba(255,0,0,0)');
+    ctx.fillStyle = hlGrad;
+    ctx.beginPath(); ctx.arc(cx, cy, 100 * pulse, 0, Math.PI*2); ctx.fill();
+
+    // Glow
+    var glowGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 130 * pulse);
+    glowGrad.addColorStop(0, 'rgba(255,45,85,0)');
+    glowGrad.addColorStop(0.5, 'rgba(255,20,50,0.12)');
+    glowGrad.addColorStop(1, 'rgba(255,0,30,0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath(); ctx.arc(cx, cy, 130 * pulse, 0, Math.PI*2); ctx.fill();
+  }
+
+  function animate() {
+    var now = Date.now();
+
+    // Heartbeat timing
+    if (now - lastBeat > beatInterval) {
+      beatPhase = 0;
+      beatStrength = 1;
+      lastBeat = now;
+      beatCount++;
+      // Slight HRV
+      bpm = 68 + Math.floor(Math.random() * 10);
+      beatInterval = 60 / bpm * 1000;
+      document.getElementById('hrValue').textContent = bpm;
+    }
+
+    // Smooth beat decay
+    beatPhase += 0.016;
+    beatStrength *= 0.94;
+    if (beatStrength < 0.001) beatStrength = 0;
+
+    drawHeart(time);
+    time += 0.016;
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+})();
+
+// ==================== ECG Waveform ====================
+(function() {
+  var canvas = document.getElementById('ecgCanvas');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var points = new Array(W).fill(H/2);
+  var ptr = 0;
+  var phase = 0;
+  var beatCounter = 0;
+
+  function drawECG() {
+    // Shift buffer
+    for (var i = 0; i < 3; i++) {
+      points[ptr] = H/2;
+      ptr = (ptr + 1) % W;
+    }
+
+    // ECG wave pattern when heartbeat occurs
+    beatCounter++;
+    if (beatCounter > 65) {
+      beatCounter = 0;
+      // P wave
+      var pStart = ptr;
+      for (var j = 0; j < 8; j++) {
+        var idx = (pStart + j) % W;
+        points[idx] = H/2 - 12 * Math.sin(j / 8 * Math.PI);
+      }
+      // Q dip
+      var qIdx = (pStart + 9) % W;
+      points[qIdx] = H/2 + 8;
+      // R spike
+      var rIdx = (pStart + 11) % W;
+      points[rIdx] = H/2 - 55;
+      // S dip
+      var sIdx = (pStart + 13) % W;
+      points[sIdx] = H/2 + 20;
+      // T wave
+      for (var k = 0; k < 12; k++) {
+        var idx2 = (pStart + 16 + k) % W;
+        points[idx2] = H/2 - 16 * Math.sin(k / 12 * Math.PI);
+      }
+    }
+
+    // Random noise
+    for (var n = 0; n < 2; n++) {
+      var ri = Math.floor(Math.random() * W);
+      points[ri] += (Math.random() - 0.5) * 4;
+    }
+
+    // Draw
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(30,30,30,1)';
+    ctx.lineWidth = 0.5;
+    for (var gy = 0; gy < 5; gy++) {
+      var yh = H * (gy + 1) / 6;
+      ctx.beginPath(); ctx.moveTo(0, yh); ctx.lineTo(W, yh); ctx.stroke();
+    }
+
+    // Glow
+    ctx.shadowColor = 'rgba(255,45,85,0.6)';
+    ctx.shadowBlur = 4;
+    ctx.strokeStyle = '#ff2d55';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, points[0]);
+    for (var x = 1; x < W; x++) {
+      var idx = (ptr + x) % W;
+      ctx.lineTo(x, points[idx]);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Bright center line
+    ctx.strokeStyle = 'rgba(255,45,85,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+
+    requestAnimationFrame(drawECG);
+  }
+
+  drawECG();
+})();
+
+// ==================== Long Press Detection ====================
+(function() {
+  var heartCanvas = document.getElementById('heartCanvas');
+  var pressRing = document.getElementById('pressRing');
+  var ringCircle = pressRing.querySelector('circle');
+  var hintText = document.getElementById('hintText');
+  var pressStart = 0;
+  var pressing = false;
+  var triggered = false;
+  var LONG_PRESS_DURATION = 2000; // 2 seconds
+
+  function updateRing(progress) {
+    var circumference = 816;
+    ringCircle.style.strokeDashoffset = circumference * (1 - progress);
+  }
+
+  heartCanvas.addEventListener('pointerdown', function(e) {
+    pressStart = Date.now();
+    pressing = true;
+    triggered = false;
+    pressRing.classList.add('active');
+    updateRing(0);
+    hintText.classList.add('fading');
+  });
+
+  heartCanvas.addEventListener('pointermove', function(e) {
+    if (!pressing) return;
+    var elapsed = Date.now() - pressStart;
+    var progress = Math.min(elapsed / LONG_PRESS_DURATION, 1);
+    updateRing(progress);
+
+    if (progress >= 1 && !triggered) {
+      triggered = true;
+      openLog();
+    }
+  });
+
+  heartCanvas.addEventListener('pointerup', function(e) {
+    pressing = false;
+    pressRing.classList.remove('active');
+    updateRing(0);
+    hintText.classList.remove('fading');
+  });
+
+  heartCanvas.addEventListener('pointerleave', function(e) {
+    pressing = false;
+    pressRing.classList.remove('active');
+    updateRing(0);
+    hintText.classList.remove('fading');
+  });
+
+  // Also detect stationary long press (no move)
+  setInterval(function() {
+    if (!pressing || triggered) return;
+    var elapsed = Date.now() - pressStart;
+    var progress = Math.min(elapsed / LONG_PRESS_DURATION, 1);
+    updateRing(progress);
+    if (progress >= 1 && !triggered) {
+      triggered = true;
+      openLog();
+    }
+  }, 100);
+})();
+
+// ==================== Log Page Logic ====================
+var logExercises = [];
+var logMode = 'normal';
+var logDate = new Date().toISOString().slice(0,10);
+
+var MUSCLE_ICONS = {
+  '胸':{icon:'🏋️',bg:'rgba(255,45,85,0.15)',c:'#ff2d55'},
+  '背':{icon:'🔙',bg:'rgba(255,149,0,0.15)',c:'#ff9500'},
+  '腿':{icon:'🦵',bg:'rgba(52,199,89,0.15)',c:'#34c759'},
+  '肩':{icon:'💪',bg:'rgba(0,122,255,0.15)',c:'#007aff'},
+  '手臂':{icon:'🦾',bg:'rgba(175,82,222,0.15)',c:'#af52de'},
+  '腹':{icon:'🫃',bg:'rgba(255,45,85,0.15)',c:'#ff2d55'},
+  '其他':{icon:'🏃',bg:'rgba(142,142,147,0.15)',c:'#8e8e93'}
+};
+
+function openLog() {
+  logDate = new Date().toISOString().slice(0,10);
+  document.getElementById('logDate').textContent = formatLogDate(logDate);
+  logExercises = [];
+  logMode = 'normal';
+  document.querySelectorAll('.qm-chip').forEach(function(c,i) {
+    c.classList.toggle('active', i===0);
+  });
+  renderLog();
+  document.body.classList.add('on-log');
+
+  // Haptic feedback simulation
+  navigator.vibrate && navigator.vibrate(10);
+}
+
+function closeLog() {
+  document.body.classList.remove('on-log');
+}
+
+function setLogMode(mode, btn) {
+  logMode = mode;
+  document.querySelectorAll('.qm-chip').forEach(function(c) {
+    c.classList.remove('active');
+  });
+  btn.classList.add('active');
+}
+
+function addLogExercise() {
+  var name = prompt('动作名称', '');
+  if (!name || !name.trim()) return;
+  var muscle = prompt('训练部位（胸/背/腿/肩/手臂/腹/其他）', '胸') || '其他';
+  logExercises.push({ name: name.trim(), muscle: muscle.trim(), sets: [] });
+  renderLog();
+}
+
+function addLogSet(exIdx) {
+  var wEl = document.getElementById('setWeight_'+exIdx);
+  var rEl = document.getElementById('setReps_'+exIdx);
+  var w = parseFloat(wEl.value);
+  var r = parseInt(rEl.value);
+  if (isNaN(w) || isNaN(r)) { alert('请输入重量和次数'); return; }
+  logExercises[exIdx].sets.push({ weight: w, reps: r });
+  renderLog();
+}
+
+function removeLogSet(exIdx, setIdx) {
+  logExercises[exIdx].sets.splice(setIdx, 1);
+  renderLog();
+}
+
+function removeLogExercise(exIdx) {
+  logExercises.splice(exIdx, 1);
+  renderLog();
+}
+
+function renderLog() {
+  var c = document.getElementById('logContent');
+  if (logExercises.length === 0) {
+    c.innerHTML = '<div style="text-align:center;padding:60px 20px;">' +
+      '<div style="font-size:48px;margin-bottom:16px;">🏋️</div>' +
+      '<div style="color:var(--text-secondary);font-size:15px;margin-bottom:16px;">还没有训练动作</div>' +
+      '<button class="add-ex-btn-log" onclick="addLogExercise()">+ 添加动作</button>' +
+      '</div>';
+    return;
+  }
+
+  var html = '';
+  logExercises.forEach(function(ex, idx) {
+    var mi = MUSCLE_ICONS[ex.muscle] || MUSCLE_ICONS['其他'];
+    var sets = ex.sets || [];
+    var setRows = sets.map(function(s, si) {
+      return '<div class="set-row-log">' +
+        '<span class="set-idx">'+(si+1)+'组</span>' +
+        '<input type="number" class="set-input" value="'+s.weight+'" readonly placeholder="kg">' +
+        '<span class="set-mult">kg ×</span>' +
+        '<input type="number" class="set-input" value="'+s.reps+'" readonly placeholder="次">' +
+        '<span class="set-mult">次</span>' +
+        '<button class="close-btn" onclick="removeLogSet('+idx+','+si+')" style="width:24px;height:24px;font-size:12px;flex-shrink:0;">✕</button>' +
+      '</div>';
+    }).join('');
+
+    var addRow = '<div class="set-row-log" style="border:1px dashed var(--accent);">' +
+      '<span class="set-idx">+</span>' +
+      '<input type="number" id="setWeight_'+idx+'" class="set-input" placeholder="重量" style="border-color:rgba(255,45,85,0.3);">' +
+      '<span class="set-mult">kg ×</span>' +
+      '<input type="number" id="setReps_'+idx+'" class="set-input" placeholder="次数" style="border-color:rgba(255,45,85,0.3);">' +
+      '<span class="set-mult">次</span>' +
+      '<button class="close-btn" onclick="addLogSet('+idx+')" style="width:24px;height:24px;font-size:12px;background:var(--accent);color:#fff;flex-shrink:0;">✓</button>' +
+    '</div>';
+
+    html += '<div class="ex-card-log">' +
+      '<div class="ex-top-row">' +
+        '<div class="ex-icon-sm" style="background:'+mi.bg+';">'+mi.icon+'</div>' +
+        '<span class="ex-name-sm">'+esc2(ex.name)+'</span>' +
+        '<span class="ex-sets-info">'+ex.muscle+' · '+sets.length+'组</span>' +
+        '<button class="close-btn" onclick="removeLogExercise('+idx+')" style="width:28px;height:28px;font-size:14px;">🗑</button>' +
+      '</div>' +
+      setRows + addRow +
+    '</div>';
+  });
+
+  html += '<button class="add-ex-btn-log" onclick="addLogExercise()" style="margin-top:4px;">+ 添加动作</button>';
+  c.innerHTML = html;
+}
+
+function saveLog() {
+  if (logExercises.length === 0) { showToast('请先添加训练动作'); return; }
+  var valid = logExercises.every(function(ex) { return ex.sets.length > 0; });
+  if (!valid) { showToast('每个动作至少添加一组'); return; }
+
+  var key = 'ft_training';
+  var records = [];
+  try { records = JSON.parse(localStorage.getItem(key)) || []; } catch(e) {}
+
+  records = records.filter(function(r) { return r.date !== logDate; });
+  records.push({
+    id: Date.now().toString(36),
+    date: logDate,
+    mode: logMode,
+    exercises: JSON.parse(JSON.stringify(logExercises))
+  });
+  localStorage.setItem(key, JSON.stringify(records));
+
+  logExercises = [];
+  closeLog();
+  updateStats();
+  showToast('训练记录已保存 ✓');
+}
+
+// ==================== Utils ====================
+function esc2(s) {
+  var d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+function formatLogDate(ds) {
+  var d = new Date(ds + 'T00:00:00');
+  return (d.getMonth()+1)+'月'+d.getDate()+'日';
+}
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2000);
+}
+
+function updateStats() {
+  var key = 'ft_training';
+  var records = [];
+  try { records = JSON.parse(localStorage.getItem(key)) || []; } catch(e) {}
+  var now = new Date();
+  var prefix = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var workouts = 0, sets = 0;
+  records.forEach(function(r) {
+    if (r.date.indexOf(prefix)===0) {
+      workouts++;
+      r.exercises.forEach(function(ex) { sets += ex.sets.length; });
+    }
+  });
+  document.getElementById('statWorkouts').textContent = workouts;
+  document.getElementById('statSets').textContent = sets;
+
+  // Streak
+  var streak = 0;
+  var check = new Date();
+  check.setHours(0,0,0,0);
+  while (true) {
+    var ds = check.toISOString().slice(0,10);
+    var found = records.some(function(r) { return r.date === ds; });
+    if (found) { streak++; check.setDate(check.getDate()-1); }
+    else break;
+  }
+  document.getElementById('statStreak').textContent = streak;
+}
+
+// ==================== Init ====================
+(function init() {
+  var today = new Date();
+  document.getElementById('todayLabel').textContent =
+    today.getFullYear()+'年'+(today.getMonth()+1)+'月'+today.getDate()+'日';
+  updateStats();
+})();
+</script>
+</body>
+</html>
